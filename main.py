@@ -1,7 +1,7 @@
 import requests
 import time
 import os
-
+ 
 def log_esemeny(szoveg):
     with open("balesetek_naplo.txt", "a", encoding="utf-8") as f:
         f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {szoveg}\n")
