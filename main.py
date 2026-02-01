@@ -1,36 +1,41 @@
 import requests
 import time
-import os
 from flask import Flask
 from threading import Thread
 
-# --- ÁL-WEBOLDAL A RENDERNEK ---
+# --- 1. WEB SZERVER (Hogy a Render ne állítsa le a programot) ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "A radar eloben fut a hatterben!"
+    return "A Radar eloben fut!"
 
 def run_web():
-    # A Render a 10000-es portot figyeli alapból
+    # A Render a 10000-es portot figyeli
     app.run(host='0.0.0.0', port=10000)
 
-# --- A TE EREDETI RADAR KÓDOD (Kicsit átalakítva a folyamatos futáshoz) ---
-def radar_loop():
-    print("🚀 Radar indítása a háttérben...")
+# --- 2. A RADAR PROGRAMOD ---
+def radar_logic():
+    print("🚀 Radar indítása...")
+    # Ide jön az eredeti Waze lekérdező kódod lényege
     while True:
-        # Ide jön a lekérdező kódod lényege
-        print(f"🔍 Pásztázás: {time.strftime('%H:%M:%S')}")
-        
-        # ... (Ide másold be a lekérdezésed többi részét) ...
-        
-        print("⏳ Várakozás 15 percet a következő frissítésig...")
-        time.sleep(900)
+        try:
+            print(f"🔍 Pásztázás: {time.strftime('%H:%M:%S')}")
+            
+            # Itt futna a Waze API hívásod...
+            # (A korábbi kódod többi részét ide illeszd be a 'while' alá)
+            
+            print("⏳ Várakozás 15 percet...")
+            time.sleep(900)
+        except Exception as e:
+            print(f"Hiba történt: {e}")
+            time.sleep(60)
 
+# --- 3. INDÍTÁS ---
 if __name__ == "__main__":
-    # 1. Elindítjuk a weboldalt egy külön szálon
-    t = Thread(target=run_web)
-    t.start()
+    # Elindítjuk a weboldalt egy külön szálon
+    server_thread = Thread(target=run_web)
+    server_thread.start()
     
-    # 2. Elindítjuk a radart a fő szálon
-    radar_loop()
+    # Elindítjuk a radarodat a fő szálon
+    radar_logic()
