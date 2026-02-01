@@ -4,65 +4,93 @@ import os
 from flask import Flask
 from threading import Thread
 
-app = Flask(__name__)
-
-# Memória a találatoknak
-radar_data = {
-    "status": "Indítás folyamatban...",
-    "incidents": [],
-    "last_check": "Soha"
+# --- 1. ADATOK TÁROLÁSA (Memória a weboldalnak) ---
+radar_status = {
+    "utolso_frissites": "Indítás...",
+    "esemenyek": []
 }
+
+app = Flask(__name__)
 
 @app.route('/')
 def home():
-    # Ez a weboldal tartalma
+    # Ez a weboldal kinézete a böngészőben
     html = f"""
     <html>
-    <head><title>Waze Radar</title><meta http-equiv="refresh" content="60"></head>
-    <body style="font-family:sans-serif; padding:20px;">
-        <h1>📡 Waze Radar Élő</h1>
-        <p><b>Állapot:</b> {radar_data['status']}</p>
-        <p><b>Utolsó frissítés:</b> {radar_data['last_check']}</p>
-        <hr>
-        <h2>Aktuális események:</h2>
-        <ul>
+    <head>
+        <title>Waze Radar Élő</title>
+        <meta http-equiv="refresh" content="60">
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }}
+            .card {{ background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }}
+            h1 {{ color: #2c3e50; }}
+            .time {{ color: #7f8c8d; font-size: 0.9em; }}
+            ul {{ list-style-type: none; padding: 0; }}
+            li {{ background: #fff; margin-bottom: 10px; padding: 10px; border-left: 5px solid #3498db; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h1>📡 Waze Radar Budapest</h1>
+            <p class="time"><b>Utolsó pásztázás:</b> {radar_status['utolso_frissites']}</p>
+            <hr>
+            <h3>Aktuális balesetek / események:</h3>
+            <ul>
     """
-    if not radar_data['incidents']:
-        html += "<li>Nincs aktív esemény a körzetben.</li>"
+    if not radar_status['esemenyek']:
+        html += "<li>Jelenleg nincs rögzített esemény, vagy a rendszer még dolgozik...</li>"
     else:
-        for inc in radar_data['incidents']:
+        for inc in radar_status['esemenyek']:
             html += f"<li>{inc}</li>"
     
-    html += "</ul></body></html>"
+    html += """
+            </ul>
+            <p style="font-size: 0.8em; color: gray; margin-top: 20px;">
+                Az oldal percenként frissül. A radar 15 percenként pásztáz.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
     return html
 
-def run_flask():
-    # A portot a Render környezeti változójából vesszük, vagy alapértelmezetten 10000
+def run_web():
+    # A Rendernek kötelező a port kezelése
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
+# --- 2. A RADAR LOGIKÁJA ---
 def radar_loop():
-    global radar_data
+    global radar_status
+    print("🚀 Radar folyamat elindítva...")
+    
     while True:
-        radar_data['status'] = "Pásztázás..."
         try:
-            # IDE JÖN A WAZE KÓDOD LÉNYEGE
-            # Példaként frissítjük az időt:
-            radar_data['last_check'] = time.strftime('%H:%M:%S')
+            current_time = time.strftime('%H:%M:%S')
+            print(f"🔍 Pásztázás indítása: {current_time}")
             
-            # Itt töltsd fel a 'radar_data['incidents']' listát a Waze találatokkal!
+            # --- Ide jön a te Waze API lekérdező kódod ---
+            # Példa adatok (ezt a részedet ide másold be):
+            # talalatok = waze_lekerdezes() 
             
-            radar_data['status'] = "Várakozás a következő körre"
-            time.sleep(900) # 15 perc pihenő
+            # Frissítjük a weboldal adatait
+            radar_status['utolso_frissites'] = current_time
+            # radar_status['esemenyek'] = talalatok (ide kerülnek a valódi adatok)
+            
+            print("⏳ Várakozás 15 percet a következő frissítésig...")
+            time.sleep(900)
+            
         except Exception as e:
-            radar_data['status'] = f"Hiba: {e}"
+            print(f"❌ Hiba a radarban: {e}")
             time.sleep(60)
 
+# --- 3. INDÍTÁS ---
 if __name__ == "__main__":
-    # 1. Először a weboldalt indítjuk el egy külön szálon!
-    web_thread = Thread(target=run_flask)
-    web_thread.daemon = True
-    web_thread.start()
+    # FONTOS: Előbb a Weboldal szálat indítjuk, hogy a Render azonnal lássa!
+    print("🌐 Weboldal indítása...")
+    t = Thread(target=run_web)
+    t.daemon = True
+    t.start()
     
-    # 2. Utána indítjuk a radart a fő szálon!
+    # Utána jöhet a végtelenített radar loop
     radar_loop()
