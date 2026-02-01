@@ -6,93 +6,83 @@ from threading import Thread
 
 app = Flask(__name__)
 
-# A fájl neve, amibe a radar menteni fog
+# Fájlnév a mentéshez
 ADAT_FAJL = "waze_debug.txt"
 
-# Memória az adatoknak a weboldalhoz
+# Állapot tároló
 radar_status = {
     "ido": "Indítás...",
-    "info": "A radar éppen ébredezik, kérlek várj 1 percet!",
+    "info": "A radar éppen ébredezik...",
     "nyers_hossz": 0
 }
 
 def radar_motor():
     global radar_status
-    # Frissített Budapest és környéke koordináták (szélesebb kör)
-    waze_url = "https://www.waze.com/row-rtserver/web/TGeoRSS?bottom=47.16&left=18.65&right=19.48&top=47.72"
+    # Ez a stabilabb URL Budapest központtal
+    waze_url = "https://www.waze.com/row-rtserver/web/TGeoRSS?bottom=47.35&left=18.95&right=19.35&top=47.65"
     
-    # Emberi böngészőt utánzó fejlécek, hogy ne blokkoljon a Waze
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Referer': 'https://www.waze.com/hu/live-map/'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/xml,application/xml,application/xhtml+xml',
+        'Referer': 'https://www.waze.com/hu/live-map/',
+        'Accept-Language': 'hu-HU,hu;q=0.9'
     }
 
     while True:
         try:
-            most = time.strftime('%Y-%m-%d %H:%M:%S')
-            response = requests.get(waze_url, headers=headers, timeout=20)
+            most = time.strftime('%H:%M:%S')
+            # Lekérés a Waze-től
+            response = requests.get(waze_url, headers=headers, timeout=15)
             
             if response.status_code == 200:
-                nyers_adat = response.text
+                tartalom = response.text
                 
-                # Mentés TXT fájlba az online megtekintéshez
+                # Mentés fájlba
                 with open(ADAT_FAJL, "w", encoding="utf-8") as f:
-                    f.write(f"UTOLSÓ SIKERES FRISSÍTÉS: {most}\n")
-                    f.write("=" * 40 + "\n")
-                    f.write(nyers_adat)
+                    f.write(f"FRISSÍTVE: {most}\n")
+                    f.write("-" * 30 + "\n")
+                    f.write(tartalom)
                 
                 radar_status['ido'] = most
-                radar_status['info'] = "✅ Kapcsolat OK - Adatok beérkeztek"
-                radar_status['nyers_hossz'] = len(nyers_adat)
-                print(f"[{most}] Radar sikeresen frissítve.")
+                radar_status['info'] = "✅ Működik - Adat érkezett"
+                radar_status['nyers_hossz'] = len(tartalom)
+                print(f"[{most}] Siker: {len(tartalom)} karakter.")
             else:
                 radar_status['info'] = f"❌ Waze hiba: {response.status_code}"
-                print(f"[{most}] Hiba: {response.status_code}")
+                print(f"Hiba: {response.status_code}")
                 
         except Exception as e:
-            radar_status['info'] = f"⚠️ Rendszerhiba: {str(e)}"
-            print(f"Hiba történt: {e}")
+            radar_status['info'] = f"⚠️ Hiba: {str(e)}"
+            print(f"Hiba: {e}")
         
-        # 5 percenként frissít (300 másodperc)
-        time.sleep(300)
+        # 3 percenként frissít
+        time.sleep(180)
 
 @app.route('/')
 def home():
+    color = "#2ecc71" if "OK" in radar_status['info'] or "Működik" in radar_status['info'] else "#e74c3c"
     return f"""
-    <body style="font-family:sans-serif; padding:50px; background:#f4f7f6; color: #333;">
-        <div style="max-width:700px; margin:auto; background:white; padding:40px; border-radius:20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-            <h1 style="color:#1a73e8; margin-bottom:10px;">📡 Waze Radar Budapest</h1>
-            <div style="background:#e8f0fe; padding:15px; border-radius:10px; margin-bottom:20px;">
-                <p style="margin:5px 0;"><b>Állapot:</b> {radar_status['info']}</p>
-                <p style="margin:5px 0;"><b>Utolsó mérés:</b> {radar_status['ido']}</p>
-                <p style="margin:5px 0;"><b>Adatméret:</b> {radar_status['nyers_hossz']} karakter</p>
+    <body style="font-family:sans-serif; background:#f0f2f5; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;">
+        <div style="background:white; padding:40px; border-radius:20px; shadow:0 4px 15px rgba(0,0,0,0.1); text-align:center; min-width:350px;">
+            <h1 style="color:#1a73e8;">🛰️ Waze Radar</h1>
+            <div style="font-size:1.2em; margin:20px 0; padding:15px; border-radius:10px; background:#f8f9fa; border-left: 5px solid {color};">
+                <p><b>Állapot:</b> {radar_status['info']}</p>
+                <p><b>Utolsó mérés:</b> {radar_status['ido']}</p>
+                <p><b>Adatméret:</b> {radar_status['nyers_hossz']} karakter</p>
             </div>
-            <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
-            <p>📂 <b>Nyers adatok ellenőrzése:</b></p>
-            <a href="/debug" style="display:inline-block; background:#1a73e8; color:white; padding:12px 25px; border-radius:8px; text-decoration:none; font-weight:bold;">TXT fájl megnyitása</a>
-            <p style="font-size:0.8em; color:#888; margin-top:20px;">A radar 5 percenként automatikusan frissül.</p>
+            <a href="/debug" style="text-decoration:none; background:#1a73e8; color:white; padding:12px 20px; border-radius:8px; font-weight:bold; display:block;">NYERS ADATOK MEGNYITÁSA</a>
         </div>
     </body>
     """
 
 @app.route('/debug')
-def debug_view():
-    try:
-        if os.path.exists(ADAT_FAJL):
-            with open(ADAT_FAJL, "r", encoding="utf-8") as f:
-                tartalom = f.read()
-            return f"<html><body style='background:#1e1e1e; color:#00ff00; padding:20px;'><pre>{tartalom}</pre></body></html>"
-        else:
-            return "A fájl még nem jött létre. Várj kb. 30 másodpercet az első mérésig!"
-    except Exception as e:
-        return f"Hiba a fájl olvasásakor: {e}"
+def debug():
+    if os.path.exists(ADAT_FAJL):
+        with open(ADAT_FAJL, "r", encoding="utf-8") as f:
+            return f"<html><body style='background:#1e1e1e; color:#00ff00; padding:20px;'><pre>{f.read()}</pre></body></html>"
+    return "Még nincs adat. Várj egy kicsit..."
 
 if __name__ == "__main__":
-    # Radar indítása külön szálon
-    t = Thread(target=radar_motor, daemon=True)
-    t.start()
-    
-    # Port beállítása a Renderhez
+    Thread(target=radar_motor, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
