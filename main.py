@@ -1,38 +1,42 @@
-import requests
-import time
 import os
+import time
 from flask import Flask
 from threading import Thread
 
 app = Flask(__name__)
-# Ebben tároljuk a legfrissebb adatokat, hogy a weboldal megmutathassa
-radar_status = {"idopont": "Indítás...", "lista": []}
+
+# Ebben tároljuk az adatokat, hogy a weboldal el érje
+status_adatok = {
+    "ido": "Még nem frissült",
+    "lista": []
+}
 
 @app.route('/')
 def home():
-    # Ez a rész felel azért, hogy ne legyen "Not Found" a böngészőben
-    return f"<h1>Waze Radar</h1><p>Utolsó sikeres pásztázás: {radar_status['idopont']}</p>", 200
+    # Nagyon egyszerű HTML, hogy biztosan ne legyen hiba
+    return f"""
+    <h1>Waze Radar Status</h1>
+    <p>Utolso ellenorzes: {status_adatok['ido']}</p>
+    <hr>
+    <p>A szerver fut, a hatterfolyamat aktiv.</p>
+    """
 
-def radar_logic():
-    global radar_status
+def radar_loop():
+    global status_adatok
     while True:
         try:
-            current_time = time.strftime('%H:%M:%S')
-            print(f"🔍 Pasztazas: {current_time}")
-            radar_status['idopont'] = current_time
-            
-            # IDE MÁSOLD BE A WAZE LEKÉRDEZŐD LÉNYEGÉT
-            # Példa: radar_status['lista'] = lekert_adatok
-            
-            time.sleep(900) # 15 perc várakozás
+            status_adatok['ido'] = time.strftime('%H:%M:%S')
+            print(f"--- Radar kor: {status_adatok['ido']} ---")
+            # Ide majd visszatesszük a Waze kódodat, ha ez már stabil
+            time.sleep(600)
         except Exception as e:
-            print(f"Hiba történt: {e}")
-            time.sleep(60)
+            print(f"Hiba: {e}")
+            time.sleep(30)
 
 if __name__ == "__main__":
-    # A radar külön szálon (Thread) fut, hogy ne blokkolja a weboldalt
-    Thread(target=radar_logic, daemon=True).start()
+    # 1. Háttérfolyamat indítása
+    Thread(target=radar_loop, daemon=True).start()
     
-    # A Render automatikusan ad portot, de ha nem, a 10000-et használjuk
+    # 2. Weboldal indítása a Render által kért porton
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
