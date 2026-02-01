@@ -1,54 +1,68 @@
 import requests
 import time
+import os
 from flask import Flask
 from threading import Thread
 
-# --- ADATOK TÁROLÁSA ---
-last_update = "Még nem futott"
-latest_incidents = []
+app = Flask(__name__)
 
-app = Flask('')
+# Memória a találatoknak
+radar_data = {
+    "status": "Indítás folyamatban...",
+    "incidents": [],
+    "last_check": "Soha"
+}
 
 @app.route('/')
 def home():
-    # Ez az, amit a böngészőben látni fogsz
-    html = f"<h1>Waze Radar ÉLŐ</h1>"
-    html += f"<p><b>Utolsó frissítés:</b> {last_update}</p>"
-    html += "<h2>Legutóbbi találatok:</h2><ul>"
-    
-    if not latest_incidents:
-        html += "<li>Nincs aktív esemény vagy még pörög a kereső...</li>"
+    # Ez a weboldal tartalma
+    html = f"""
+    <html>
+    <head><title>Waze Radar</title><meta http-equiv="refresh" content="60"></head>
+    <body style="font-family:sans-serif; padding:20px;">
+        <h1>📡 Waze Radar Élő</h1>
+        <p><b>Állapot:</b> {radar_data['status']}</p>
+        <p><b>Utolsó frissítés:</b> {radar_data['last_check']}</p>
+        <hr>
+        <h2>Aktuális események:</h2>
+        <ul>
+    """
+    if not radar_data['incidents']:
+        html += "<li>Nincs aktív esemény a körzetben.</li>"
     else:
-        for inc in latest_incidents:
+        for inc in radar_data['incidents']:
             html += f"<li>{inc}</li>"
     
-    html += "</ul><p><i>Az oldal 15 percenként frissül automatikusan a háttérben.</i></p>"
+    html += "</ul></body></html>"
     return html
 
-def run_web():
-    app.run(host='0.0.0.0', port=10000)
+def run_flask():
+    # A portot a Render környezeti változójából vesszük, vagy alapértelmezetten 10000
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
 
-def radar_logic():
-    global last_update, latest_incidents
+def radar_loop():
+    global radar_data
     while True:
+        radar_data['status'] = "Pásztázás..."
         try:
-            current_time = time.strftime('%H:%M:%S')
-            print(f"🔍 Pásztázás: {current_time}")
+            # IDE JÖN A WAZE KÓDOD LÉNYEGE
+            # Példaként frissítjük az időt:
+            radar_data['last_check'] = time.strftime('%H:%M:%S')
             
-            # --- Ide jön a Waze lekérdező részed ---
-            # Példa: tegyük fel, hogy 'talalatok' a lista, amit a Waze-ből kapsz
-            # Ezt a részt a saját kódoddal kell összehangolni!
+            # Itt töltsd fel a 'radar_data['incidents']' listát a Waze találatokkal!
             
-            # TESZT ADATOK (hogy lásd, működik):
-            last_update = current_time
-            latest_incidents = ["Baleset az M0-son", "Útmunkálatok a Váci úton"] 
-            
-            time.sleep(900)
+            radar_data['status'] = "Várakozás a következő körre"
+            time.sleep(900) # 15 perc pihenő
         except Exception as e:
-            print(f"Hiba: {e}")
+            radar_data['status'] = f"Hiba: {e}"
             time.sleep(60)
 
 if __name__ == "__main__":
-    server_thread = Thread(target=run_web)
-    server_thread.start()
-    radar_logic()
+    # 1. Először a weboldalt indítjuk el egy külön szálon!
+    web_thread = Thread(target=run_flask)
+    web_thread.daemon = True
+    web_thread.start()
+    
+    # 2. Utána indítjuk a radart a fő szálon!
+    radar_loop()
